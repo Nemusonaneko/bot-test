@@ -28,7 +28,6 @@ async function run(chain) {
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const contract = new ethers.Contract(contractAddress, abi, provider);
   const interface = contract.interface;
-
   const scheduleFilter = contract.filters.WithdrawScheduled();
   const cancelFilter = contract.filters.WithdrawCancelled();
   const executeFilter = contract.filters.WithdrawExecuted();
@@ -40,7 +39,6 @@ async function run(chain) {
   const endTimestamp =
     new Date(new Date(Date.now()).toISOString().slice(0, 10)).getTime() / 1e3;
   const startTimestamp = endTimestamp - 86400;
-
   const scheduleEvents = {};
   for (let i = 0; i < events.length; i++) {
     const data = ethers.utils.defaultAbiCoder.decode(
@@ -115,9 +113,11 @@ async function run(chain) {
     ]);
     calls.push(data);
   }
-  await contract.connect(wallet).batch(calls, {
-    gasLimit: 500000,
-  });
+  if (calls.length > 0) {
+    await contract.connect(wallet).batch(calls, {
+      gasLimit: 500000,
+    });
+  }
 }
 
 async function main() {
