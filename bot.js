@@ -5,7 +5,7 @@ require("dotenv").config();
 const chains = ["goerli"];
 
 const rpcs = {
-  goerli: "https://goerli.infura.io/v3/ad633b68185d47cf9e4f378de6bb5b2a",
+  goerli: `https://goerli.infura.io/v3/${process.env.INFURA_KEY}`,
 };
 
 const contractAddresses = {
