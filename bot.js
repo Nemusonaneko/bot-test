@@ -9,7 +9,7 @@ const rpcs = {
 };
 
 const contractAddresses = {
-  goerli: "0xC4092A8eA23B18578586B1D294a1ff5525F4F0f9",
+  goerli: "0xdE7c52F1049ea7Cc7D20aF4708e6566994830807",
 };
 
 const topics = {
@@ -107,7 +107,7 @@ async function run(chain) {
   }
   const calls = [];
   for (const owner in toExecute) {
-    const data = interface.encodeFunctionResult("executeTransactions", [
+    const data = interface.encodeFunctionData("executeTransactions", [
       toExecute[owner],
       owner,
     ]);
