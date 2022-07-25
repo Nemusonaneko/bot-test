@@ -9,7 +9,7 @@ const rpcs = {
 };
 
 const contractAddresses = {
-  goerli: "0xdE7c52F1049ea7Cc7D20aF4708e6566994830807",
+  goerli: "0x408D44C21657065C20b2dD9DbbD3d7665FC1821E",
 };
 
 const topics = {
@@ -90,7 +90,7 @@ async function run(chain) {
           ? (toExecute[last.owner] = [data])
           : toExecute[last.owner].push(data);
       }
-    } else if (last.topic === "WithdrawScheduled" >= endTimestamp) {
+    } else if (last.topic === "WithdrawScheduled" && last.starts <= endTimestamp) {
       const data = interface.encodeFunctionData("executeWithdraw", [
         last.owner,
         last.llamaPay,
