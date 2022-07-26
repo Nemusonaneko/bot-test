@@ -28,19 +28,15 @@ async function run(chain) {
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const contract = new ethers.Contract(contractAddress, abi, provider);
   const interface = contract.interface;
-  const scheduleFilter = contract.filters.WithdrawScheduled();
-  const cancelFilter = contract.filters.WithdrawCancelled();
-  const executeFilter = contract.filters.WithdrawExecuted();
-  const events = await contract.queryFilter([
-    scheduleFilter,
-    cancelFilter,
-    executeFilter,
-  ]);
+  const filter = contract.filters;
+  const events = await contract.queryFilter(
+    filter
+  );
   const endTimestamp =
     new Date(new Date(Date.now()).toISOString().slice(0, 10)).getTime() / 1e3;
   const startTimestamp = endTimestamp - 86400;
   const scheduleEvents = {};
-  for (let i = 0; i < events.length; i++) {
+  events.forEach((e) => {
     const data = ethers.utils.defaultAbiCoder.decode(
       [
         "address",
@@ -52,15 +48,15 @@ async function run(chain) {
         "uint40",
         "bytes32",
       ],
-      events[i].data
+      e.data
     );
     const id = data[7];
     if (scheduleEvents[id] === undefined) {
       scheduleEvents[id] = [];
     }
     scheduleEvents[id].push({
-      block: events[i].blockNumber,
-      topic: topics[events[i].topics[0]],
+      block: e.blockNumber,
+      topic: topics[e.topics[0]],
       owner: data[0],
       llamaPay: data[1],
       from: data[2],
@@ -69,7 +65,7 @@ async function run(chain) {
       starts: data[5],
       frequency: data[6],
     });
-  }
+  })
   const toExecute = {};
   for (const id in scheduleEvents) {
     const last = scheduleEvents[id][scheduleEvents[id].length - 1];
