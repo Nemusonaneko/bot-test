@@ -9,7 +9,7 @@ const rpcs = {
 };
 
 const contractAddresses = {
-  goerli: "0x408D44C21657065C20b2dD9DbbD3d7665FC1821E",
+  goerli: "0x40e8A053AcFd1A236f5B52414F8dcabcC5a4594e",
 };
 
 const topics = {
