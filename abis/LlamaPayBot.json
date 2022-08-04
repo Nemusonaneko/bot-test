@@ -277,6 +277,16 @@
   },
   {
     "inputs": [
+      { "internalType": "bytes[]", "name": "_calls", "type": "bytes[]" },
+      { "internalType": "address", "name": "_owner", "type": "address" }
+    ],
+    "name": "executeOwnerWithdrawal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       { "internalType": "address", "name": "_owner", "type": "address" },
       { "internalType": "address", "name": "_llamaPay", "type": "address" },
       { "internalType": "address", "name": "_from", "type": "address" },

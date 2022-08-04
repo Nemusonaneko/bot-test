@@ -20,11 +20,11 @@ const chainIds = {
 };
 
 const contractAddresses = {
-  goerli: "0x43162634efc09DFA29b72b0238561c4dE169e857",
+  goerli: "0xAF86436289454f0D862160b914BFE768bCcF9920",
 };
 
 const blockCreated = {
-  goerli: 7343178,
+  goerli: 7343399,
 };
 
 const topics = {
