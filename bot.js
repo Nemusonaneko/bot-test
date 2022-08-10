@@ -7,11 +7,14 @@ const chains = ["goerli"];
 
 const rpcs = {
   goerli: `https://goerli.infura.io/v3/${process.env.INFURA_KEY}`,
+  avalanche: "https://api.avax.network/ext/bc/C/rpc",
 };
 
 const graphapi = {
   goerli:
     "https://api.thegraph.com/subgraphs/name/nemusonaneko/llamapay-goerli",
+  avalanche:
+    "https://api.thegraph.com/subgraphs/name/nemusonaneko/llamapay-avalanche-mainnet",
 };
 
 const chainIds = {
@@ -20,20 +23,13 @@ const chainIds = {
 };
 
 const contractAddresses = {
-  goerli: "0xAF86436289454f0D862160b914BFE768bCcF9920",
+  goerli: "0xDb0bcb18436379083A9FBdbe23075d9B89020cfE",
+  avalanche: "0xDa33d4B2753B3C2439cA52678E1A506e4C5294d1",
 };
 
 const blockCreated = {
-  goerli: 7343399,
-};
-
-const topics = {
-  "0x2964df00d05d867fb39d81ec5ed1d5ab5125691de320bbc5cfc5faf7a5505369":
-    "WithdrawScheduled",
-  "0x2d7e851ad23abc91818637874db4164af53ae6d837db0c7d96f847a556ab2f69":
-    "WithdrawCancelled",
-  "0xf02b6913a0661fd5a19a298c7bac40f63b16c538b8799cf36812e1224e2e9c60":
-    "WithdrawExecuted",
+  goerli: 7377342,
+  avalanche: 18219329,
 };
 
 const zeroAdd = "0x0000000000000000000000000000000000000000";
@@ -53,6 +49,9 @@ async function run(chain) {
     const interface = contract.interface;
     const endBlock = await provider.getBlockNumber();
     let currBlock = blockCreated[chain];
+    const startTimestamp =
+      new Date(new Date(Date.now()).toISOString().slice(0, 10)).getTime() / 1e3;
+    const endTimestamp = startTimestamp + 86400;
     const filters = contract.filters;
     let events = [];
     do {
@@ -69,72 +68,78 @@ async function run(chain) {
       );
       events = events.concat(queriedEvents);
     } while (currBlock < endBlock);
-    const endTimestamp =
-      new Date(new Date(Date.now()).toISOString().slice(0, 10)).getTime() / 1e3;
-    const startTimestamp = endTimestamp - 86400;
-    const scheduleEvents = {};
+    const withdraws = {};
+    const redirects = {};
     for (const i in events) {
-      const data = ethers.utils.defaultAbiCoder.decode(
-        [
-          "address",
-          "address",
-          "address",
-          "address",
-          "uint216",
-          "uint40",
-          "uint40",
-          "bytes32",
-        ],
-        events[i].data
-      );
-      const block = events[i].blockNumber;
-      const topic = topics[events[i].topics[0]];
-      const owner = data[0];
-      const llamaPay = data[1];
-      const from = data[2];
-      const to = data[3];
-      const amountPerSec = data[4];
-      const starts = data[5];
-      const frequency = data[6];
-      const id = data[7];
-      if (scheduleEvents[id] === undefined) {
-        scheduleEvents[id] = [];
+      const event = events[i];
+      const eventTopic = events[i].event;
+      if (
+        eventTopic === "WithdrawScheduled" ||
+        eventTopic === "WithdrawExecuted" ||
+        eventTopic === "WithdrawCancelled"
+      ) {
+        if (withdraws[event.args.id] === undefined) {
+          withdraws[event.args.id] = [];
+        }
+        const newArr = withdraws[event.args.id];
+        newArr.push(event);
+        withdraws[event.args.id] = newArr;
+      } else if (
+        eventTopic === "RedirectScheduled" ||
+        eventTopic === "RedirectExecuted" ||
+        eventTopic === "RedirectCancelled"
+      ) {
+        if (redirects[event.args.id] === undefined) {
+          redirects[event.args.id] = [];
+        }
+        const newArr = redirects[event.args.id];
+        newArr.push(event);
+        redirects[event.args.id] = newArr;
       }
-      scheduleEvents[id].push({
-        block,
-        topic,
-        owner,
-        llamaPay,
-        from,
-        to,
-        amountPerSec,
-        starts,
-        frequency,
-      });
     }
     const toExecute = {};
-    for (const i in scheduleEvents) {
-      const last = scheduleEvents[i][scheduleEvents[i].length - 1];
-      if (
-        (last.topic !== "WithdrawScheduled" &&
-          last.topic !== "WithdrawExecuted") ||
-        last.starts > endTimestamp
-      )
-        continue;
-      if (last.topic === "WithdrawExecuted") {
+    for (const i in withdraws) {
+      const last = withdraws[i][withdraws[i].length - 1];
+      const args = last.args;
+      if (last.event === "WithdrawCancelled") continue;
+      if (args.starts > endTimestamp) continue;
+      if (last.event === "WithdrawExecuted") {
         const timestamp = (await provider.getBlock(last.block)).timestamp;
-        const toUpdate = timestamp + last.frequency;
+        const toUpdate = timestamp + args.frequency;
         if (toUpdate < startTimestamp || toUpdate > endTimestamp) continue;
       }
-      let query;
       if (
-        last.llamaPay === zeroAdd &&
-        last.to === zeroAdd &&
-        Number(last.amountPerSec) === 0
+        args.llamaPay !== zeroAdd &&
+        args.from !== zeroAdd &&
+        args.to !== zeroAdd &&
+        args.amountPerSec !== 0
       ) {
-        query = gql`{
-          streams(where:{payer: "${last.owner.toLowerCase()}", active: true, paused: false}) {
+        const data = interface.encodeFunctionData("executeWithdraw", [
+          args.owner,
+          args.llamaPay,
+          args.from,
+          args.to,
+          args.amountPerSec,
+          args.starts,
+          args.frequency,
+          true,
+          true,
+        ]);
+        if (toExecute[args.owner] === undefined) {
+          toExecute[args.owner] = [];
+        }
+        const newArr = toExecute[args.owner];
+        newArr.push(data);
+        toExecute[args.owner] = newArr;
+      } else {
+        const query = gql`{
+          streams(where:{${
+            args.from === zeroAdd ? "payee" : "payer"
+          }: "${args.owner.toLowerCase()}", active: true, paused: false}) {
                 contract {
+                  address
+                }
+                payer {
                   address
                 }
                 payee {
@@ -143,101 +148,93 @@ async function run(chain) {
                 amountPerSec
               }
         }`;
-      } else if (
-        last.llamaPay === zeroAdd &&
-        last.from === zeroAdd &&
-        Number(last.amountPerSec) === 0
-      ) {
-        query = gql`{
-          streams(where:{payee: "${last.owner.toLowerCase()}", active: true, paused: false}) {
-                contract {
-                  address
-                }
-                payer {
-                  address
-                }
-                amountPerSec
-              }
-        }`;
-      } else {
-        const data = interface.encodeFunctionData("executeWithdraw", [
-          last.owner,
-          last.llamaPay,
-          last.from,
-          last.to,
-          last.amountPerSec,
-          last.starts,
-          last.frequency,
-        ]);
-        if (toExecute[last.owner] === undefined) {
-          toExecute[last.owner] = [data];
-        } else {
-          toExecute[last.owner].push(data);
+        const queryRes = (await request(graphApi[chain], query)).streams;
+        const calls = [];
+        for (const j in queryRes) {
+          const res = queryRes[j];
+          calls.push(
+            interface.encodeFunctionData("executeWithdraw", [
+              args.owner,
+              res.contract.address,
+              res.payer.address,
+              res.payee.address,
+              res.amountPerSec,
+              args.starts,
+              args.frequency,
+              true,
+              false,
+            ])
+          );
         }
-        continue;
-      }
-      const response = (await request(graphapi[chain], query)).streams;
-      const calls = [];
-      for (const j in response) {
-        const res = response[j];
         calls.push(
           interface.encodeFunctionData("executeWithdraw", [
-            last.owner,
-            res.contract.address,
-            last.from === zeroAdd ? res.payer.address : last.from,
-            last.to === zeroAdd ? res.payee.address : last.to,
-            res.amountPerSec,
-            last.starts,
-            last.frequency,
+            args.owner,
+            args.llamaPay,
+            args.from,
+            args.to,
+            args.amountPerSec,
+            args.starts,
+            args.frequency,
             false,
+            true,
           ])
         );
-      }
-      calls.push(
-        interface.encodeFunctionData("executeWithdraw", [
-          last.owner,
-          last.llamaPay,
-          last.from === zeroAdd ? zeroAdd : last.from,
-          last.to === zeroAdd ? zeroAdd : last.to,
-          last.amountPerSec,
-          last.starts,
-          last.frequency,
-          true,
-        ])
-      );
-      if (toExecute[last.owner] === undefined) {
-        toExecute[last.owner] = calls;
-      } else {
-        toExecute[last.owner] = toExecute[last.owner].concat(calls);
+        if (toExecute[args.owner] === undefined) {
+          toExecute[args.owner] = [];
+        }
+        const newArr = toExecute[args.owner];
+        newArr = newArr.concat(calls);
+        toExecute[args.owner] = newArr;
       }
     }
-    const calls = [];
-    const owners = [];
-    for (const owner in toExecute) {
-      const ownerBalance = await contract.balances(owner);
-      const data = interface.encodeFunctionData("executeOwnerWithdrawal", [
-        toExecute[owner],
-        owner,
+    for (const i in redirects) {
+      const last = redirects[i][redirects[i].length - 1];
+      const args = last.args;
+      if (last.event === "RedirectCancelled") continue;
+      if (args.starts > endTimestamp) continue;
+      if (last.event === "RedirectExecuted") {
+        const timestamp = (await provider.getBlock(last.block)).timestamp;
+        const toUpdate = timestamp + args.frequency;
+        if (toUpdate < startTimestamp || toUpdate > endTimestamp) continue;
+      }
+      const data = interface.encodeFunctionData("executeRedirect", [
+        args.from,
+        args.to,
+        args.token,
+        args.amount,
+        args.starts,
+        args.frequency,
       ]);
-      const gasCost = await provider.estimateGas({
+      if (toExecute[args.from] === undefined) {
+        toExecute[args.from] = [];
+      }
+      const newArr = toExecute[args.from];
+      newArr.push(data);
+      toExecute[args.from] = newArr;
+    }
+    const calls = [];
+    for (const i in toExecute) {
+      const data = interface.encodeFunctionData("execute", [toExecute[i], i]);
+      const bal = await contract.balances(i);
+      const cost = await provider.estimateGas({
+        from: "0xFE5eE99FDbcCFAda674A3b85EF653b3CE4656e13",
         to: contractAddresses[chain],
         data: data,
       });
-      if (Number(ownerBalance) >= Number(gasCost)) {
+      if (Number(bal) >= Number(cost)) {
         calls.push(data);
-        owners.push(owner);
       }
     }
-    if (
-      calls.length > 0 &&
-      owners.length > 0 &&
-      calls.length == owners.length
-    ) {
-      await contract
-        .connect(signer)
-        .batchExecuteOwnerWithdrawals(calls, owners, {
-          gasLimit: 500000,
-        });
+    if (calls.length > 0) {
+      const data = interface.encodeFunctionData("batchExecute", [calls]);
+      const cost = await provider.estimateGas({
+        from: "0xFE5eE99FDbcCFAda674A3b85EF653b3CE4656e13",
+        to: contractAddresses[chain],
+        data: data,
+      });
+      await contract.connect(signer).batchExecute(calls, {
+        gasLimit: Number(cost) + 1000000,
+      });
     }
   } catch (error) {
     console.log(error);

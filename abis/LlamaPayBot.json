@@ -5,11 +5,145 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "_owner",
+        "name": "from",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint40",
+        "name": "starts",
+        "type": "uint40"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint40",
+        "name": "frequency",
+        "type": "uint40"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
       }
     ],
-    "name": "OwnerWithdrawFailed",
+    "name": "RedirectCancelled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint40",
+        "name": "starts",
+        "type": "uint40"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint40",
+        "name": "frequency",
+        "type": "uint40"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RedirectExecuted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint40",
+        "name": "starts",
+        "type": "uint40"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint40",
+        "name": "frequency",
+        "type": "uint40"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RedirectScheduled",
     "type": "event"
   },
   {
@@ -133,25 +267,6 @@
       },
       {
         "indexed": false,
-        "internalType": "bytes",
-        "name": "data",
-        "type": "bytes"
-      }
-    ],
-    "name": "WithdrawFailed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "indexed": false,
         "internalType": "address",
         "name": "llamaPay",
         "type": "address"
@@ -197,6 +312,13 @@
     "type": "event"
   },
   {
+    "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "name": "activeRedirects",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
     "name": "balances",
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
@@ -205,10 +327,9 @@
   },
   {
     "inputs": [
-      { "internalType": "bytes[]", "name": "_calls", "type": "bytes[]" },
-      { "internalType": "address[]", "name": "_owners", "type": "address[]" }
+      { "internalType": "bytes[]", "name": "_calls", "type": "bytes[]" }
     ],
-    "name": "batchExecuteOwnerWithdrawals",
+    "name": "batchExecute",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -218,6 +339,47 @@
     "name": "bot",
     "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_from", "type": "address" },
+      { "internalType": "address", "name": "_to", "type": "address" },
+      { "internalType": "address", "name": "_token", "type": "address" },
+      { "internalType": "uint256", "name": "_amount", "type": "uint256" },
+      { "internalType": "uint40", "name": "_starts", "type": "uint40" },
+      { "internalType": "uint40", "name": "_frequency", "type": "uint40" }
+    ],
+    "name": "calcRedirectId",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_llamaPay", "type": "address" },
+      { "internalType": "address", "name": "_from", "type": "address" },
+      { "internalType": "address", "name": "_to", "type": "address" },
+      { "internalType": "uint216", "name": "_amountPerSec", "type": "uint216" },
+      { "internalType": "uint40", "name": "_starts", "type": "uint40" },
+      { "internalType": "uint40", "name": "_frequency", "type": "uint40" }
+    ],
+    "name": "calcWithdrawId",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_to", "type": "address" },
+      { "internalType": "address", "name": "_token", "type": "address" },
+      { "internalType": "uint256", "name": "_amount", "type": "uint256" },
+      { "internalType": "uint40", "name": "_starts", "type": "uint40" },
+      { "internalType": "uint40", "name": "_frequency", "type": "uint40" }
+    ],
+    "name": "cancelRedirect",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -235,40 +397,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      { "internalType": "address", "name": "_newBot", "type": "address" }
-    ],
-    "name": "changeBot",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_newFee", "type": "uint256" }
-    ],
-    "name": "changeFee",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "_newLlama", "type": "address" }
-    ],
-    "name": "changeLlama",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "confirmNewLlama",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "deposit",
     "outputs": [],
@@ -278,9 +406,23 @@
   {
     "inputs": [
       { "internalType": "bytes[]", "name": "_calls", "type": "bytes[]" },
-      { "internalType": "address", "name": "_owner", "type": "address" }
+      { "internalType": "address", "name": "_from", "type": "address" }
     ],
-    "name": "executeOwnerWithdrawal",
+    "name": "execute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_from", "type": "address" },
+      { "internalType": "address", "name": "_to", "type": "address" },
+      { "internalType": "address", "name": "_token", "type": "address" },
+      { "internalType": "uint256", "name": "_amount", "type": "uint256" },
+      { "internalType": "uint40", "name": "_starts", "type": "uint40" },
+      { "internalType": "uint40", "name": "_frequency", "type": "uint40" }
+    ],
+    "name": "executeRedirect",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -294,7 +436,8 @@
       { "internalType": "uint216", "name": "_amountPerSec", "type": "uint216" },
       { "internalType": "uint40", "name": "_starts", "type": "uint40" },
       { "internalType": "uint40", "name": "_frequency", "type": "uint40" },
-      { "internalType": "bool", "name": "emitEvent", "type": "bool" }
+      { "internalType": "bool", "name": "_execute", "type": "bool" },
+      { "internalType": "bool", "name": "_emitEvent", "type": "bool" }
     ],
     "name": "executeWithdraw",
     "outputs": [],
@@ -306,21 +449,6 @@
     "name": "fee",
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "_owner", "type": "address" },
-      { "internalType": "address", "name": "_llamaPay", "type": "address" },
-      { "internalType": "address", "name": "_from", "type": "address" },
-      { "internalType": "address", "name": "_to", "type": "address" },
-      { "internalType": "uint216", "name": "_amountPerSec", "type": "uint216" },
-      { "internalType": "uint40", "name": "_starts", "type": "uint40" },
-      { "internalType": "uint40", "name": "_frequency", "type": "uint40" }
-    ],
-    "name": "getWithdrawId",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
-    "stateMutability": "pure",
     "type": "function"
   },
   {
@@ -338,15 +466,21 @@
     "type": "function"
   },
   {
-    "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
-    "name": "owners",
-    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "stateMutability": "view",
+    "inputs": [],
+    "name": "refund",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "refund",
+    "inputs": [
+      { "internalType": "address", "name": "_to", "type": "address" },
+      { "internalType": "address", "name": "_token", "type": "address" },
+      { "internalType": "uint256", "name": "_amount", "type": "uint256" },
+      { "internalType": "uint40", "name": "_starts", "type": "uint40" },
+      { "internalType": "uint40", "name": "_frequency", "type": "uint40" }
+    ],
+    "name": "scheduleRedirect",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -363,6 +497,13 @@
     "name": "scheduleWithdraw",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "name": "withdrawOwners",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
     "type": "function"
   }
 ]
