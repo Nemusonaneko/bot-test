@@ -7,29 +7,23 @@ const chains = ["goerli"];
 
 const rpcs = {
   goerli: `https://goerli.infura.io/v3/${process.env.INFURA_KEY}`,
-  avalanche: "https://api.avax.network/ext/bc/C/rpc",
 };
 
-const graphapi = {
+const graphApi = {
   goerli:
     "https://api.thegraph.com/subgraphs/name/nemusonaneko/llamapay-goerli",
-  avalanche:
-    "https://api.thegraph.com/subgraphs/name/nemusonaneko/llamapay-avalanche-mainnet",
 };
 
 const chainIds = {
   goerli: 5,
-  avalanche: 43114,
 };
 
 const contractAddresses = {
-  goerli: "0xDb0bcb18436379083A9FBdbe23075d9B89020cfE",
-  avalanche: "0xDa33d4B2753B3C2439cA52678E1A506e4C5294d1",
+  goerli: "0x469E31392F3c12b8624815Abc79a331838182aAe",
 };
 
 const blockCreated = {
-  goerli: 7377342,
-  avalanche: 18219329,
+  goerli: 7381991,
 };
 
 const zeroAdd = "0x0000000000000000000000000000000000000000";
@@ -69,33 +63,11 @@ async function run(chain) {
       events = events.concat(queriedEvents);
     } while (currBlock < endBlock);
     const withdraws = {};
-    const redirects = {};
     for (const i in events) {
-      const event = events[i];
-      const eventTopic = events[i].event;
-      if (
-        eventTopic === "WithdrawScheduled" ||
-        eventTopic === "WithdrawExecuted" ||
-        eventTopic === "WithdrawCancelled"
-      ) {
-        if (withdraws[event.args.id] === undefined) {
-          withdraws[event.args.id] = [];
-        }
-        const newArr = withdraws[event.args.id];
-        newArr.push(event);
-        withdraws[event.args.id] = newArr;
-      } else if (
-        eventTopic === "RedirectScheduled" ||
-        eventTopic === "RedirectExecuted" ||
-        eventTopic === "RedirectCancelled"
-      ) {
-        if (redirects[event.args.id] === undefined) {
-          redirects[event.args.id] = [];
-        }
-        const newArr = redirects[event.args.id];
-        newArr.push(event);
-        redirects[event.args.id] = newArr;
-      }
+      const id = events[i].args.id;
+      const newArray = withdraws[id] ?? [];
+      newArray.push(events[i]);
+      withdraws[id] = newArray;
     }
     const toExecute = {};
     for (const i in withdraws) {
@@ -108,27 +80,22 @@ async function run(chain) {
         const toUpdate = timestamp + args.frequency;
         if (toUpdate < startTimestamp || toUpdate > endTimestamp) continue;
       }
-      if (
-        args.llamaPay !== zeroAdd &&
-        args.from !== zeroAdd &&
-        args.to !== zeroAdd &&
-        args.amountPerSec !== 0
-      ) {
+      if (args.llamaPay !== zeroAdd) {
         const data = interface.encodeFunctionData("executeWithdraw", [
           args.owner,
           args.llamaPay,
           args.from,
           args.to,
+          args.token,
+          args.redirectTo,
           args.amountPerSec,
           args.starts,
           args.frequency,
+          args.id,
           true,
           true,
         ]);
-        if (toExecute[args.owner] === undefined) {
-          toExecute[args.owner] = [];
-        }
-        const newArr = toExecute[args.owner];
+        const newArr = toExecute[args.owner] ?? [];
         newArr.push(data);
         toExecute[args.owner] = newArr;
       } else {
@@ -138,6 +105,9 @@ async function run(chain) {
           }: "${args.owner.toLowerCase()}", active: true, paused: false}) {
                 contract {
                   address
+                  token {
+                    address
+                  }
                 }
                 payer {
                   address
@@ -158,9 +128,12 @@ async function run(chain) {
               res.contract.address,
               res.payer.address,
               res.payee.address,
+              res.contract.token.address,
+              args.redirectTo,
               res.amountPerSec,
               args.starts,
               args.frequency,
+              args.id,
               true,
               false,
             ])
@@ -172,69 +145,44 @@ async function run(chain) {
             args.llamaPay,
             args.from,
             args.to,
+            args.token,
+            args.redirectTo,
             args.amountPerSec,
             args.starts,
             args.frequency,
+            args.id,
             false,
             true,
           ])
         );
-        if (toExecute[args.owner] === undefined) {
-          toExecute[args.owner] = [];
-        }
-        const newArr = toExecute[args.owner];
+        let newArr = toExecute[args.owner] ?? [];
         newArr = newArr.concat(calls);
         toExecute[args.owner] = newArr;
       }
-    }
-    for (const i in redirects) {
-      const last = redirects[i][redirects[i].length - 1];
-      const args = last.args;
-      if (last.event === "RedirectCancelled") continue;
-      if (args.starts > endTimestamp) continue;
-      if (last.event === "RedirectExecuted") {
-        const timestamp = (await provider.getBlock(last.block)).timestamp;
-        const toUpdate = timestamp + args.frequency;
-        if (toUpdate < startTimestamp || toUpdate > endTimestamp) continue;
+      const calls = [];
+      for (const i in toExecute) {
+        const data = interface.encodeFunctionData("execute", [toExecute[i], i]);
+        const bal = await contract.balances(i);
+        const cost = await provider.estimateGas({
+          from: "0xFE5eE99FDbcCFAda674A3b85EF653b3CE4656e13",
+          to: contractAddresses[chain],
+          data: data,
+        });
+        if (Number(bal) >= Number(cost)) {
+          calls.push(data);
+        }
       }
-      const data = interface.encodeFunctionData("executeRedirect", [
-        args.from,
-        args.to,
-        args.token,
-        args.amount,
-        args.starts,
-        args.frequency,
-      ]);
-      if (toExecute[args.from] === undefined) {
-        toExecute[args.from] = [];
+      if (calls.length > 0) {
+        const data = interface.encodeFunctionData("batchExecute", [calls]);
+        const cost = await provider.estimateGas({
+          from: "0xFE5eE99FDbcCFAda674A3b85EF653b3CE4656e13",
+          to: contractAddresses[chain],
+          data: data,
+        });
+        await contract.connect(signer).batchExecute(calls, {
+          gasLimit: Number(cost) + 1000000,
+        });
       }
-      const newArr = toExecute[args.from];
-      newArr.push(data);
-      toExecute[args.from] = newArr;
-    }
-    const calls = [];
-    for (const i in toExecute) {
-      const data = interface.encodeFunctionData("execute", [toExecute[i], i]);
-      const bal = await contract.balances(i);
-      const cost = await provider.estimateGas({
-        from: "0xFE5eE99FDbcCFAda674A3b85EF653b3CE4656e13",
-        to: contractAddresses[chain],
-        data: data,
-      });
-      if (Number(bal) >= Number(cost)) {
-        calls.push(data);
-      }
-    }
-    if (calls.length > 0) {
-      const data = interface.encodeFunctionData("batchExecute", [calls]);
-      const cost = await provider.estimateGas({
-        from: "0xFE5eE99FDbcCFAda674A3b85EF653b3CE4656e13",
-        to: contractAddresses[chain],
-        data: data,
-      });
-      await contract.connect(signer).batchExecute(calls, {
-        gasLimit: Number(cost) + 1000000,
-      });
     }
   } catch (error) {
     console.log(error);
